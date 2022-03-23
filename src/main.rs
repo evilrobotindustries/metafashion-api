@@ -16,10 +16,19 @@ mod ws;
 type Result<T> = std::result::Result<T, warp::Rejection>;
 
 const CONNECTION_STRING: &str = "CONNECTION_STRING";
+const API_KEY: &str = "API_KEY";
+
+// lazy_static::lazy_static! {
+//     pub static ref API_KEY2: &'static str = &env::var(API_KEY).expect(&format!("{} has not been provided", API_KEY));
+// }
 
 #[tokio::main]
 async fn main() {
-    if env::var_os(CONNECTION_STRING).is_none() {
+    //let api_key = env::var(API_KEY).expect(&format!("{} has not been provided", API_KEY));
+
+    //print!("{}", API_KEY2);
+
+    if env::var(CONNECTION_STRING).is_err() {
         env::set_var(
             CONNECTION_STRING,
             "postgres://postgres@127.0.0.1:7878/postgres",
@@ -47,7 +56,7 @@ async fn main() {
 
     // Create routes
     let routes = filters::health(pool.clone())
-        .or(filters::vip::all(pool, clients.clone()))
+        .or(filters::vip::all("", pool, clients.clone()))
         .or(filters::websockets(clients))
         .with(warp::log("api"))
         .with(warp::cors().allow_any_origin())

@@ -17,6 +17,8 @@ pub enum Error {
     DatabaseInitialisationError(tokio_postgres::Error),
     #[error("error reading file: {0}")]
     ReadFileError(#[from] std::io::Error),
+    #[error("user not authorized")]
+    NotAuthorized(String),
 }
 
 #[derive(Serialize)]

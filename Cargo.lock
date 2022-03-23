@@ -538,6 +538,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "futures",
+ "lazy_static",
  "log",
  "mobc",
  "mobc-postgres",
