@@ -81,7 +81,7 @@ impl Hub {
 
         // Create client identifier and track number of peers
         let id = NEXT_USERID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        tracing::debug!("client connected {}", id);
+        tracing::debug!("client {} connected", id);
         self.clients.write().await.insert(id);
 
         // Update peer with number of registrations on join
@@ -134,7 +134,7 @@ impl Hub {
         send_task.abort();
         broadcast_task.abort();
         self.clients.write().await.remove(&id);
-        tracing::debug!("client disconnected {}", id);
+        tracing::debug!("client {} disconnected", id);
 
         // Broadcast peer left to remaining subscribers
         if let Err(e) = self.broadcast(Message::PeerLeft {
