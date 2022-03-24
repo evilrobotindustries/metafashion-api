@@ -60,11 +60,11 @@ async fn main() {
     let app = Router::new()
         // Routes
         .route("/health", get(handlers::health))
-        .route("/vip", get(handlers::vip::total))
-        .route(
-            "/vip/:address",
-            get(handlers::vip::check).put(handlers::vip::register),
-        )
+        // .route("/vip", get(handlers::vip::total))
+        // .route(
+        //     "/vip/:address",
+        //     get(handlers::vip::check).put(handlers::vip::register),
+        // )
         .route("/ws", get(handlers::websocket))
         // Middleware
         .layer(
