@@ -1,5 +1,5 @@
 use chrono::prelude::*;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct Registration {

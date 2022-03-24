@@ -1,33 +1,26 @@
-use std::{collections::HashMap, env, sync::Arc};
-use tokio::sync::Mutex;
-use warp::http::StatusCode;
-use warp::Filter;
+use crate::hub::Hub;
+use axum::{extract::Extension, routing::get, Router};
+use std::{
+    env,
+    {net::SocketAddr, sync::Arc},
+};
+use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-#[macro_use]
-extern crate log;
-
-mod data;
 mod db;
 mod error;
 mod filters;
 mod handlers;
-mod ws;
+mod hub;
+mod models;
 
-type Result<T> = std::result::Result<T, warp::Rejection>;
+type Result<T> = std::result::Result<T, error::Error>;
 
 const CONNECTION_STRING: &str = "CONNECTION_STRING";
-const API_KEY: &str = "API_KEY";
-
-// lazy_static::lazy_static! {
-//     pub static ref API_KEY2: &'static str = &env::var(API_KEY).expect(&format!("{} has not been provided", API_KEY));
-// }
+const API_KEY: &str = "hnbh9WEllWzFzVviUClOGQ==";
 
 #[tokio::main]
 async fn main() {
-    //let api_key = env::var(API_KEY).expect(&format!("{} has not been provided", API_KEY));
-
-    //print!("{}", API_KEY2);
-
     if env::var(CONNECTION_STRING).is_err() {
         env::set_var(
             CONNECTION_STRING,
@@ -36,32 +29,56 @@ async fn main() {
     }
 
     // Initialise logging
-    pretty_env_logger::init();
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "debug,tower_http=debug".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
-    // Create database connection pool and then initialise
+    // Create database connection pool
     let pool = db::create_pool(&env::var(CONNECTION_STRING).expect(&format!(
         "{} environment variable not set",
         CONNECTION_STRING
     )))
+    .await
     .expect("database connection pool cannot be created.");
-    let connection = db::get_connection(&pool)
+
+    // Initialise database
+    let connection = pool
+        .get_connection()
         .await
         .expect("could not get connection to database");
     db::initialise(&connection)
         .await
         .expect("database can't be initialized");
 
-    // Create map for web socket clients
-    let clients: ws::Clients = Arc::new(Mutex::new(HashMap::new()));
+    // Create websocket hub
+    let hub = Arc::new(Hub::init(pool.clone(), API_KEY.to_string()));
 
-    // Create routes
-    let routes = filters::health(pool.clone())
-        .or(filters::vip::all("", pool, clients.clone()))
-        .or(filters::websockets(clients))
-        .with(warp::log("api"))
-        .with(warp::cors().allow_any_origin())
-        .recover(error::handle_rejection);
+    // build our application with some routes
+    let app = Router::new()
+        // Routes
+        .route("/health", get(handlers::health))
+        .route("/vip", get(handlers::vip::total))
+        .route(
+            "/vip/:address",
+            get(handlers::vip::check).put(handlers::vip::register),
+        )
+        .route("/ws", get(handlers::websocket))
+        // Middleware
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::default().include_headers(true)),
+        )
+        .layer(Extension(pool)) // Connection pool
+        .layer(Extension(hub));
 
-    info!("Starting api...");
-    warp::serve(routes).run(([127, 0, 0, 1], 8000)).await;
+    // Finally start server
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+    tracing::debug!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
