@@ -17,15 +17,18 @@ mod models;
 type Result<T> = std::result::Result<T, error::Error>;
 
 const CONNECTION_STRING: &str = "CONNECTION_STRING";
-const API_KEY: &str = "hnbh9WEllWzFzVviUClOGQ==";
+const API_KEY: &str = "API_KEY";
 
 #[tokio::main]
 async fn main() {
-    if env::var(CONNECTION_STRING).is_err() {
-        env::set_var(
-            CONNECTION_STRING,
-            "postgres://postgres@127.0.0.1:7878/postgres",
-        );
+    // Validate required configuration (todo: use config crate)
+    let connection_string = env::var(CONNECTION_STRING);
+    if connection_string.is_err() {
+        panic!("{} not set", CONNECTION_STRING)
+    }
+    let api_key = env::var(API_KEY);
+    if api_key.is_err() {
+        panic!("{} not set", API_KEY)
     }
 
     // Initialise logging
@@ -37,12 +40,9 @@ async fn main() {
         .init();
 
     // Create database connection pool
-    let pool = db::create_pool(&env::var(CONNECTION_STRING).expect(&format!(
-        "{} environment variable not set",
-        CONNECTION_STRING
-    )))
-    .await
-    .expect("database connection pool cannot be created.");
+    let pool = db::ConnectionPool::create(connection_string.unwrap())
+        .await
+        .expect("database connection pool cannot be created.");
 
     // Initialise database
     let connection = pool
@@ -54,7 +54,7 @@ async fn main() {
         .expect("database can't be initialized");
 
     // Create websocket hub
-    let hub = Arc::new(Hub::init(pool.clone(), API_KEY.to_string()));
+    let hub = Arc::new(Hub::init(pool.clone(), api_key.unwrap()));
 
     // build our application with some routes
     let app = Router::new()

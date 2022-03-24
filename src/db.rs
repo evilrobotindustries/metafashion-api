@@ -2,16 +2,45 @@ use crate::error::Error::*;
 use bb8::{Pool, PooledConnection};
 use bb8_postgres::PostgresConnectionManager;
 use std::fs;
-use tokio_postgres::{Error, NoTls};
+use tokio_postgres::Error;
+use tokio_postgres_rustls::MakeRustlsConnect;
 
-pub type Connection = PooledConnection<'static, PostgresConnectionManager<NoTls>>;
+pub type Connection = PooledConnection<'static, PostgresConnectionManager<MakeRustlsConnect>>;
 
 const INITIALISATION_SCRIPT: &str = "./db.sql";
 
 #[derive(Clone)]
-pub struct ConnectionPool(Pool<PostgresConnectionManager<NoTls>>);
+pub struct ConnectionPool(Pool<PostgresConnectionManager<MakeRustlsConnect>>);
 
 impl ConnectionPool {
+    pub async fn create(connection_string: String) -> std::result::Result<ConnectionPool, Error> {
+        // Initialise root certificate store using Mozilla root certificates
+        let mut root_store = rustls::RootCertStore::empty();
+        root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(|ta| {
+            rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
+                ta.subject,
+                ta.spki,
+                ta.name_constraints,
+            )
+        }));
+
+        // Create tls config, using root cert store
+        let config = rustls::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+        let tls = tokio_postgres_rustls::MakeRustlsConnect::new(config);
+
+        // Create manager and then finally
+        let manager = PostgresConnectionManager::new_from_stringlike(connection_string, tls)
+            .expect("could not parse the connection string");
+        let pool = Pool::builder()
+            .build(manager)
+            .await
+            .expect("could not build connection pool");
+        Ok(ConnectionPool(pool))
+    }
+
     pub async fn get_connection(&self) -> crate::Result<Connection> {
         Ok(self.0.get_owned().await?)
     }
@@ -33,16 +62,6 @@ pub async fn healthy(connection: &Connection) -> crate::Result<()> {
         .await
         .map_err(DatabaseQueryError)?;
     Ok(())
-}
-
-pub async fn create_pool(connection_string: &str) -> std::result::Result<ConnectionPool, Error> {
-    let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls).unwrap();
-    Ok(ConnectionPool(
-        Pool::builder()
-            .build(manager)
-            .await
-            .expect("could not build connection pool"),
-    ))
 }
 
 pub mod vip {
