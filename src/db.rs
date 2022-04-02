@@ -67,40 +67,41 @@ pub async fn healthy(connection: &Connection) -> crate::Result<()> {
 pub mod vip {
     use crate::db::Connection;
     use crate::error::Error::DatabaseQueryError;
-    use crate::models::{Registration, Registrations};
+    use crate::models::{SignUp, SignUps};
 
-    const CHECK_REGISTRATION_QUERY: &str = "SELECT address FROM vip WHERE address = $1";
-    const REGISTER_QUERY: &str = "INSERT INTO vip (address) VALUES ($1) RETURNING *";
-    const TOTAL_REGISTRATIONS_QUERY: &str = "SELECT COUNT(*), MAX(registered_at) FROM vip";
+    const CHECK_SIGNUP_QUERY: &str = "SELECT address FROM vip WHERE address = $1";
+    const SIGNUP_COMMAND: &str = "INSERT INTO vip (address) VALUES ($1) RETURNING *";
+    const TOTAL_SIGNUPS_QUERY: &str = "SELECT COUNT(*), MAX(signed_up_at) FROM vip";
 
     pub async fn check(connection: &Connection, address: &str) -> crate::Result<bool> {
         let result = connection
-            .query_opt(CHECK_REGISTRATION_QUERY, &[&address])
+            .query_opt(CHECK_SIGNUP_QUERY, &[&address])
             .await
             .map_err(DatabaseQueryError)?;
         Ok(result.is_some())
     }
 
-    pub async fn register(connection: &Connection, address: &str) -> crate::Result<Registration> {
+    pub async fn sign_up(connection: &Connection, address: &str) -> crate::Result<SignUp> {
         let result = connection
-            .query_one(REGISTER_QUERY, &[&address])
+            .query_one(SIGNUP_COMMAND, &[&address])
             .await
             .map_err(DatabaseQueryError)?;
 
-        Ok(Registration {
+        Ok(SignUp {
             address: result.get(0),
-            registered_at: result.get(1),
+            signed_up_at: result.get(1),
         })
     }
 
-    pub async fn total(connection: &Connection) -> crate::Result<Registrations> {
+    pub async fn total(connection: &Connection) -> crate::Result<SignUps> {
         let result = connection
-            .query_one(TOTAL_REGISTRATIONS_QUERY, &[])
+            .query_one(TOTAL_SIGNUPS_QUERY, &[])
             .await
             .map_err(DatabaseQueryError)?;
-        Ok(Registrations {
-            total: result.get(0),
-            last_registered: result.get(1),
+        let total: i64 = result.get(0);
+        Ok(SignUps {
+            total: total as u64,
+            last_signed_up: result.get(1),
         })
     }
 }

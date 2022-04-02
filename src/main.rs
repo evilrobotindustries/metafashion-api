@@ -63,7 +63,7 @@ async fn main() {
         // .route("/vip", get(handlers::vip::total))
         // .route(
         //     "/vip/:address",
-        //     get(handlers::vip::check).put(handlers::vip::register),
+        //     get(handlers::vip::check).put(handlers::vip::sign_up),
         // )
         .route("/ws", get(handlers::websocket))
         // Middleware

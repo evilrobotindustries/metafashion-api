@@ -2,13 +2,13 @@ use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
-pub struct Registration {
+pub struct SignUp {
     pub address: String,
-    pub registered_at: DateTime<Utc>,
+    pub signed_up_at: DateTime<Utc>,
 }
 
 #[derive(Serialize)]
-pub struct Registrations {
-    pub total: i64,
-    pub last_registered: Option<DateTime<Utc>>,
+pub struct SignUps {
+    pub total: u64,
+    pub last_signed_up: Option<DateTime<Utc>>,
 }

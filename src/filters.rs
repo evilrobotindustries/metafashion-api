@@ -88,7 +88,7 @@
 //         clients: Clients,
 //     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
 //         check(pool.clone(), api_key)
-//             .or(register(pool.clone(), clients))
+//             .or(sign_up(pool.clone(), clients))
 //             .or(total(pool))
 //     }
 //
@@ -108,7 +108,7 @@
 //     }
 //
 //     /// PUT /vip/:address
-//     pub fn register(
+//     pub fn sign_up(
 //         pool: ConnectionPool,
 //         clients: Clients,
 //     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -116,7 +116,7 @@
 //             .and(warp::put())
 //             .and(super::with_pool(pool))
 //             .and(super::with_clients(clients))
-//             .and_then(handlers::vip::register)
+//             .and_then(handlers::vip::sign_up)
 //     }
 //
 //     /// GET /vip

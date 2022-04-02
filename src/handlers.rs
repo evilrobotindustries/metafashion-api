@@ -32,7 +32,7 @@ pub async fn websocket(
 
 // pub mod vip {
 //     use crate::handlers::Connection;
-//     use crate::models::Registrations;
+//     use crate::models::SignUps;
 //     use crate::{db, Hub};
 //     use axum::extract::{Extension, Path};
 //     use axum::http::StatusCode;
@@ -50,7 +50,7 @@ pub async fn websocket(
 //         }
 //     }
 //
-//     pub async fn register(
+//     pub async fn sign_up(
 //         Path(address): Path<String>,
 //         Connection(connection): Connection,
 //         Extension(hub): Extension<Arc<Hub>>,
@@ -60,22 +60,22 @@ pub async fn websocket(
 //             return Ok(StatusCode::CREATED);
 //         }
 //
-//         // Register address
-//         db::vip::register(&connection, &address).await?;
+//         // Sign up address
+//         db::vip::sign_up(&connection, &address).await?;
 //
 //         // Broadcast updated total to clients
-//         let registrations = db::vip::total(&connection).await?;
-//         if let Err(e) = hub.broadcast(crate::hub::Message::Registered {
-//             total: registrations.total,
+//         let sign_ups = db::vip::total(&connection).await?;
+//         if let Err(e) = hub.broadcast(crate::hub::Message::SignedUp {
+//             total: sign_ups.total,
 //             address: None,
-//             last_registered: registrations.last_registered,
+//             last_signed_up: sign_ups.last_signed_up,
 //         }) {
-//             tracing::error!("an error occurred whilst broadcasting a registration {}", e);
+//             tracing::error!("an error occurred whilst broadcasting a sign-up {}", e);
 //         }
 //         Ok(StatusCode::OK)
 //     }
 //
-//     pub async fn total(Connection(connection): Connection) -> crate::Result<Json<Registrations>> {
+//     pub async fn total(Connection(connection): Connection) -> crate::Result<Json<SignUps>> {
 //         Ok(Json(db::vip::total(&connection).await?))
 //     }
 // }

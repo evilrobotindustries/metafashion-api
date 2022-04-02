@@ -84,15 +84,15 @@ impl Hub {
         tracing::debug!("client {} connected", id);
         self.clients.write().await.insert(id);
 
-        // Update peer with number of registrations on join
+        // Update peer with number of sign-ups on join
         let connection = self.pool.get_connection().await.unwrap();
-        let registrations = db::vip::total(&connection).await.unwrap();
+        let sign_ups = db::vip::total(&connection).await.unwrap();
         let sender = MessageSender(tx.clone());
         sender
-            .send(Message::Registered {
-                total: registrations.total,
+            .send(Message::SignedUp {
+                total: sign_ups.total,
                 address: None,
-                last_registered: registrations.last_registered,
+                last_signed_up: sign_ups.last_signed_up,
             })
             .await;
 
@@ -110,7 +110,7 @@ impl Hub {
 
         // Broadcast peer joined
         if let Err(e) = self.broadcast(Message::PeerJoined {
-            total: self.clients.read().await.len() as i64,
+            total: self.clients.read().await.len() as u64,
             last_joined: Some(chrono::Utc::now()),
         }) {
             tracing::warn!("unable to notify clients of peer {} joining: {}", id, e);
@@ -138,7 +138,7 @@ impl Hub {
 
         // Broadcast peer left to remaining subscribers
         if let Err(e) = self.broadcast(Message::PeerLeft {
-            total: self.clients.read().await.len() as i64,
+            total: self.clients.read().await.len() as u64,
             last_left: Some(chrono::Utc::now()),
         }) {
             tracing::warn!("unable to notify clients of peer {} leaving: {}", id, e);
@@ -152,40 +152,40 @@ impl Hub {
     ) -> Result<(), crate::error::Error> {
         let connection = self.pool.get_connection().await?;
 
-        let mut registered: bool;
+        let mut signed_up: bool;
         match message {
-            Request::Register { address } => {
-                tracing::debug!("register received");
+            Request::SignUp { address } => {
+                tracing::debug!("sign-up received");
 
-                // Check if address already registered
-                registered = db::vip::check(&connection, &address).await?;
-                if !registered {
-                    // Register address
-                    db::vip::register(&connection, &address).await?;
-                    registered = true;
+                // Check if address already signed up
+                signed_up = db::vip::check(&connection, &address).await?;
+                if !signed_up {
+                    // Sign up address
+                    db::vip::sign_up(&connection, &address).await?;
+                    signed_up = true;
                 }
             }
             Request::Check { address } => {
                 tracing::debug!("check received");
 
-                registered = db::vip::check(&connection, &address).await?;
+                signed_up = db::vip::check(&connection, &address).await?;
             }
         }
 
         // Broadcast updated total to clients
-        let registrations = db::vip::total(&connection).await?;
-        self.broadcast(Message::Registered {
-            total: registrations.total,
+        let signups = db::vip::total(&connection).await?;
+        self.broadcast(Message::SignedUp {
+            total: signups.total,
             address: None,
-            last_registered: registrations.last_registered,
+            last_signed_up: signups.last_signed_up,
         })?;
 
-        // Send checked message back to sender with registration status
+        // Send checked message back to sender with signup status
         sender
-            .send(Message::Registered {
-                total: registrations.total,
-                address: Some(registered),
-                last_registered: registrations.last_registered,
+            .send(Message::SignedUp {
+                total: signups.total,
+                address: Some(signed_up),
+                last_signed_up: signups.last_signed_up,
             })
             .await;
         Ok(())
@@ -210,8 +210,8 @@ impl MessageSender {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub enum Request {
-    #[serde(rename = "register")]
-    Register { address: String },
+    #[serde(rename = "sign-up")]
+    SignUp { address: String },
     #[serde(rename = "check")]
     Check { address: String },
 }
@@ -219,20 +219,20 @@ pub enum Request {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub enum Message {
-    #[serde(rename = "registered")]
-    Registered {
-        total: i64,
+    #[serde(rename = "signed-up")]
+    SignedUp {
+        total: u64,
         address: Option<bool>,
-        last_registered: Option<DateTime<Utc>>,
+        last_signed_up: Option<DateTime<Utc>>,
     },
     #[serde(rename = "peer-joined")]
     PeerJoined {
-        total: i64,
+        total: u64,
         last_joined: Option<DateTime<Utc>>,
     },
     #[serde(rename = "peer-left")]
     PeerLeft {
-        total: i64,
+        total: u64,
         last_left: Option<DateTime<Utc>>,
     },
 }
