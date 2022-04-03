@@ -1,4 +1,5 @@
 use bb8::RunError;
+use rustc_hex::FromHexError;
 use serde::Serialize;
 use thiserror::Error;
 
@@ -18,6 +19,8 @@ pub enum Error {
     SerialisationError(#[from] serde_json::Error),
     #[error("The request was unauthorised")]
     UnauthorisedError,
+    #[error("error converting from hex: {0}")]
+    HashError(#[from] FromHexError),
 }
 
 #[derive(Serialize)]

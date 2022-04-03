@@ -68,12 +68,15 @@ pub mod vip {
     use crate::db::Connection;
     use crate::error::Error::DatabaseQueryError;
     use crate::models::{SignUp, SignUps};
+    use primitive_types::H160;
+    use std::str::FromStr;
 
     const CHECK_SIGNUP_QUERY: &str = "SELECT address FROM vip WHERE address = $1";
     const SIGNUP_COMMAND: &str = "INSERT INTO vip (address) VALUES ($1) RETURNING *";
     const TOTAL_SIGNUPS_QUERY: &str = "SELECT COUNT(*), MAX(signed_up_at) FROM vip";
 
-    pub async fn check(connection: &Connection, address: &str) -> crate::Result<bool> {
+    pub async fn check(connection: &Connection, address: H160) -> crate::Result<bool> {
+        let address = format!("{:x}", address);
         let result = connection
             .query_opt(CHECK_SIGNUP_QUERY, &[&address])
             .await
@@ -81,14 +84,15 @@ pub mod vip {
         Ok(result.is_some())
     }
 
-    pub async fn sign_up(connection: &Connection, address: &str) -> crate::Result<SignUp> {
+    pub async fn sign_up(connection: &Connection, address: H160) -> crate::Result<SignUp> {
+        let address = format!("{:x}", address);
         let result = connection
             .query_one(SIGNUP_COMMAND, &[&address])
             .await
             .map_err(DatabaseQueryError)?;
 
         Ok(SignUp {
-            address: result.get(0),
+            address: H160::from_str(result.get(0))?,
             signed_up_at: result.get(1),
         })
     }

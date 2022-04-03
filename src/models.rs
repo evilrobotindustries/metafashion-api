@@ -1,9 +1,10 @@
 use chrono::prelude::*;
+use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct SignUp {
-    pub address: String,
+    pub address: H160,
     pub signed_up_at: DateTime<Utc>,
 }
 

@@ -3,6 +3,7 @@ use axum::extract::ws::WebSocket;
 use chrono::{DateTime, Utc};
 use futures::stream::SplitStream;
 use futures::{sink::SinkExt, stream::StreamExt};
+use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tokio::sync::{broadcast, mpsc};
@@ -158,17 +159,17 @@ impl Hub {
                 tracing::debug!("sign-up received");
 
                 // Check if address already signed up
-                signed_up = db::vip::check(&connection, &address).await?;
+                signed_up = db::vip::check(&connection, address).await?;
                 if !signed_up {
                     // Sign up address
-                    db::vip::sign_up(&connection, &address).await?;
+                    db::vip::sign_up(&connection, address).await?;
                     signed_up = true;
                 }
             }
             Request::Check { address } => {
                 tracing::debug!("check received");
 
-                signed_up = db::vip::check(&connection, &address).await?;
+                signed_up = db::vip::check(&connection, address).await?;
             }
         }
 
@@ -211,9 +212,9 @@ impl MessageSender {
 #[serde(tag = "type")]
 pub enum Request {
     #[serde(rename = "sign-up")]
-    SignUp { address: String },
+    SignUp { address: H160 },
     #[serde(rename = "check")]
-    Check { address: String },
+    Check { address: H160 },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
