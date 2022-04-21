@@ -12,4 +12,11 @@ pub struct SignUp {
 pub struct SignUps {
     pub total: u64,
     pub last_signed_up: Option<DateTime<Utc>>,
+    pub status: Status,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+pub enum Status {
+    Closed = 0,
+    Open = 1,
 }

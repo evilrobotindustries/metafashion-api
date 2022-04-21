@@ -67,13 +67,15 @@ pub async fn healthy(connection: &Connection) -> crate::Result<()> {
 pub mod vip {
     use crate::db::Connection;
     use crate::error::Error::DatabaseQueryError;
-    use crate::models::{SignUp, SignUps};
+    use crate::models::{SignUp, SignUps, Status};
     use primitive_types::H160;
     use std::str::FromStr;
+    use tokio_postgres::Row;
 
-    const CHECK_SIGNUP_QUERY: &str = "SELECT address FROM vip WHERE address = $1";
-    const SIGNUP_COMMAND: &str = "INSERT INTO vip (address) VALUES ($1) RETURNING *";
-    const TOTAL_SIGNUPS_QUERY: &str = "SELECT COUNT(*), MAX(signed_up_at) FROM vip";
+    const CHECK_STATUS_QUERY: &str = "SELECT status FROM vip";
+    const CHECK_SIGNUP_QUERY: &str = "SELECT address FROM vip_signups WHERE address = $1";
+    const SIGNUP_COMMAND: &str = "INSERT INTO vip_signups (address) VALUES ($1) RETURNING *";
+    const TOTAL_SIGNUPS_QUERY: &str = "SELECT COUNT(*), MAX(signed_up_at) FROM vip_signups";
 
     pub async fn check(connection: &Connection, address: H160) -> crate::Result<bool> {
         let address = format!("{:x}", address);
@@ -85,6 +87,10 @@ pub mod vip {
     }
 
     pub async fn sign_up(connection: &Connection, address: H160) -> crate::Result<SignUp> {
+        if matches!(status(connection).await?, Status::Closed) {
+            return Err(crate::error::Error::VIPSignupClosed);
+        }
+
         let address = format!("{:x}", address);
         let result = connection
             .query_one(SIGNUP_COMMAND, &[&address])
@@ -97,7 +103,25 @@ pub mod vip {
         })
     }
 
+    pub async fn status(connection: &Connection) -> crate::Result<Status> {
+        let result = connection
+            .query_opt(CHECK_STATUS_QUERY, &[])
+            .await
+            .map_err(DatabaseQueryError)?;
+        Ok(match result {
+            None => Status::Closed,
+            Some(result) => {
+                let status: bool = result.get(0);
+                match status {
+                    true => Status::Open,
+                    false => Status::Closed,
+                }
+            }
+        })
+    }
+
     pub async fn total(connection: &Connection) -> crate::Result<SignUps> {
+        let status = status(connection).await?;
         let result = connection
             .query_one(TOTAL_SIGNUPS_QUERY, &[])
             .await
@@ -106,6 +130,7 @@ pub mod vip {
         Ok(SignUps {
             total: total as u64,
             last_signed_up: result.get(1),
+            status,
         })
     }
 }

@@ -1,3 +1,5 @@
+use crate::error::Error;
+use crate::models::Status;
 use crate::{db, error};
 use axum::extract::ws::WebSocket;
 use chrono::{DateTime, Utc};
@@ -94,6 +96,7 @@ impl Hub {
                 total: sign_ups.total,
                 address: None,
                 last_signed_up: sign_ups.last_signed_up,
+                status: sign_ups.status,
             })
             .await;
 
@@ -162,8 +165,15 @@ impl Hub {
                 signed_up = db::vip::check(&connection, address).await?;
                 if !signed_up {
                     // Sign up address
-                    db::vip::sign_up(&connection, address).await?;
-                    signed_up = true;
+                    match db::vip::sign_up(&connection, address).await {
+                        Ok(_) => signed_up = true,
+                        Err(e) => match e {
+                            Error::VIPSignupClosed => {}
+                            _ => {
+                                return Err(e);
+                            }
+                        },
+                    }
                 }
             }
             Request::Check { address } => {
@@ -179,6 +189,7 @@ impl Hub {
             total: signups.total,
             address: None,
             last_signed_up: signups.last_signed_up,
+            status: signups.status,
         })?;
 
         // Send checked message back to sender with signup status
@@ -187,6 +198,7 @@ impl Hub {
                 total: signups.total,
                 address: Some(signed_up),
                 last_signed_up: signups.last_signed_up,
+                status: signups.status,
             })
             .await;
         Ok(())
@@ -225,6 +237,7 @@ pub enum Message {
         total: u64,
         address: Option<bool>,
         last_signed_up: Option<DateTime<Utc>>,
+        status: Status,
     },
     #[serde(rename = "peer-joined")]
     PeerJoined {

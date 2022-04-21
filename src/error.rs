@@ -21,6 +21,8 @@ pub enum Error {
     UnauthorisedError,
     #[error("error converting from hex: {0}")]
     HashError(#[from] FromHexError),
+    #[error("VIP signup closed")]
+    VIPSignupClosed,
 }
 
 #[derive(Serialize)]
